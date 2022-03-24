@@ -1,0 +1,20 @@
+[package]
+name = "apifiny"
+version = "0.1.0"
+edition = "2021"
+author = "shenshouer51@gmail.com"
+
+[dependencies]
+jwt = "0.16"
+hmac = { version = "0.12", features = ["reset"] }
+sha2 = "0.10"
+reqwest = { version = "0.11", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+dotenv = "0.15"
+tracing = "0.1"
+tracing-subscriber = { version="0.3", features = ["env-filter"] }
+thiserror = "1.0"
+clap = { version = "3", features = ["derive", "env"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"]}
