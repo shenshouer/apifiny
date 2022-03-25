@@ -6,7 +6,7 @@ mod token;
 mod utils;
 
 /// rest client
-mod rest_client;
+pub mod rest_client;
 pub use rest_client::{Period, RestClient};
 
 mod constants;

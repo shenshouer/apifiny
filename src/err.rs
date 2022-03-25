@@ -18,6 +18,8 @@ pub enum Error {
     #[error(transparent)]
     InvalidHeaderValue(#[from] reqwest::header::InvalidHeaderValue),
     #[error(transparent)]
+    Serialize(#[from] serde_json::Error),
+    #[error(transparent)]
     Utf8Error(#[from] core::str::Utf8Error),
     #[error("venue not set")]
     VenueNotSet(),
