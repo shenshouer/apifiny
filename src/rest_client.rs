@@ -23,6 +23,7 @@ impl RestClient {
 
     // Base Information
 
+    // https://doc.apifiny.com/connect/#query-list-venues
     pub async fn list_venue_info(&self, venue: &str) -> Result<ApiFinyResponse<Vec<VenueInfo>>> {
         let req_url = format!(
             "{}/ac/v2/{}/utils/listVenueInfo",
@@ -35,6 +36,7 @@ impl RestClient {
             .await?)
     }
 
+    // https://doc.apifiny.com/connect/#query-list-currencies
     pub async fn list_currency(&self, venue: &str) -> Result<ApiFinyResponse<Vec<CurrencyInfo>>> {
         let req_url = format!("{}/ac/v2/{}/utils/listCurrency", BASE_URL_REST_OTHER, venue);
         Ok(self
@@ -44,6 +46,7 @@ impl RestClient {
             .await?)
     }
 
+    // https://doc.apifiny.com/connect/#query-list-symbols
     pub async fn list_symbol_info(&self, venue: &str) -> Result<ApiFinyResponse<Vec<SymbolInfo>>> {
         let req_url = format!(
             "{}/ac/v2/{}/utils/listSymbolInfo",
@@ -56,6 +59,7 @@ impl RestClient {
             .await?)
     }
 
+    // https://doc.apifiny.com/connect/#query-current-timestamp-of-server
     pub async fn current_time_millis(&self, venue: &str) -> Result<ApiFinyResponse<i64>> {
         let req_url = format!(
             "{}/ac/v2/{}/utils/currentTimeMillis",
@@ -71,6 +75,7 @@ impl RestClient {
     // Market Data
     // Rate Limit: We throttle public endpoints by IP address 1 request per second
 
+    // https://doc.apifiny.com/connect/#order-book-rest-api
     pub async fn order_book(&self, symbol: &str, venue: &str) -> Result<OrderBook> {
         let req_url = format!(
             "{}/md/orderbook/v1/{}/{}",
@@ -83,6 +88,7 @@ impl RestClient {
             .await?)
     }
 
+    // https://doc.apifiny.com/connect/#trades-rest-api
     pub async fn trade(&self, symbol: &str, venue: &str) -> Result<Vec<TradeOrder>> {
         let req_url = format!("{}/md/trade/v1/{}/{}", BASE_URL_REST_OTHER, symbol, venue);
         Ok(self
@@ -92,6 +98,7 @@ impl RestClient {
             .await?)
     }
 
+    // https://doc.apifiny.com/connect/#ohlcv-rest-api
     // VENUE	Venue name
     // BASE	Base asset
     // QUOTE	Quote Asset
@@ -125,6 +132,7 @@ impl RestClient {
             .await?)
     }
 
+    // https://doc.apifiny.com/connect/#ticker-rest-api
     pub async fn ticker(&self, symbol: &str, venue: &str) -> Result<Ticker> {
         let req_url = format!("{}/md/ticker/v1/{}/{}", BASE_URL_REST_OTHER, symbol, venue);
         Ok(self
@@ -134,6 +142,7 @@ impl RestClient {
             .await?)
     }
 
+    // https://doc.apifiny.com/connect/#consolidated-order-book-rest-api
     pub async fn consolidated_order_book(&self, symbol: &str) -> Result<ConsolidatedOrderBook> {
         let req_url = format!("{}/md/cob/v1/{}", BASE_URL_REST_OTHER, symbol);
         // let s = self.do_http(req_url, None, None).await?.text().await?;
@@ -149,6 +158,7 @@ impl RestClient {
 
     // Account
 
+    // https://doc.apifiny.com/connect/#query-account-info
     pub async fn query_account_info(&self) -> Result<ApiFinyResponse<Account>> {
         if let Some(ref venue) = self.venue {
             let req_url = format!("{}/account/queryAccountInfo", venue.rest);
@@ -168,6 +178,7 @@ impl RestClient {
     }
 
     // Query Account Asset
+    // https://doc.apifiny.com/connect/#query-account-asset
     pub async fn list_balance(&self) -> Result<ApiFinyResponse<Vec<Balance>>> {
         if let Some(ref venue) = self.venue {
             let req_url = format!("{}/asset/listBalance", venue.rest);
@@ -187,6 +198,7 @@ impl RestClient {
     }
 
     // Get Deposit Address
+    // https://doc.apifiny.com/connect/#get-deposit-address
     pub async fn query_address(&self, coin: &str) -> Result<ApiFinyResponse<Vec<DepositAddress>>> {
         if let Some(ref venue) = self.venue {
             let req_url = format!("{}/asset/queryAddress", venue.rest);
@@ -207,6 +219,7 @@ impl RestClient {
     }
 
     // Create a Withdraw Ticket
+    // https://doc.apifiny.com/connect/#create-a-withdraw-ticket
     pub async fn create_withdraw_ticket(&self) -> Result<ApiFinyResponse<WithdrawTicket>> {
         if let Some(ref venue) = self.venue {
             let req_url = format!("{}/asset/createWithdrawTicket", venue.rest);
@@ -226,6 +239,7 @@ impl RestClient {
     }
 
     // Create a Withdraw Request
+    // https://doc.apifiny.com/connect/#create-a-withdraw-request
     pub async fn create_withdraw(
         &self,
         params: CreateWithdrawParams,
@@ -240,6 +254,206 @@ impl RestClient {
             let params = serde_json::to_value(params)?;
 
             super::utils::merge(&mut body, &params);
+            // println!("==>{}", body);
+            // let s = self
+            //     .do_http(reqwest::Method::GET, req_url, None, Some(body))
+            //     .await?
+            //     .text()
+            //     .await?;
+            // println!("==>{}", s);
+            // return Ok(());
+
+            return Ok(self
+                .do_http(reqwest::Method::POST, req_url, None, Some(body))
+                .await?
+                .json()
+                .await?);
+        }
+        Err(super::Error::VenueNotSet())
+    }
+
+    // Transfer Between Venues
+    // https://doc.apifiny.com/connect/#transfer-between-venues
+    pub async fn transfer_to_venue(
+        &self,
+        params: TransferBetweenVenuesParams,
+    ) -> Result<ApiFinyResponse<Vec<TransferBetweenVenuesResponse>>> {
+        if let Some(ref venue) = self.venue {
+            let req_url = format!("{}/asset/transferToVenue", venue.rest);
+
+            let mut query = json!({
+                "accountId": self.conf.apifiny_account_id,
+                "venue": venue.name,
+            });
+            let params = serde_json::to_value(params)?;
+
+            super::utils::merge(&mut query, &params);
+            // println!("==>{}", body);
+            // let s = self
+            //     .do_http(reqwest::Method::GET, req_url, None, Some(body))
+            //     .await?
+            //     .text()
+            //     .await?;
+            // println!("==>{}", s);
+            // return Ok(());
+
+            return Ok(self
+                .do_http(reqwest::Method::GET, req_url, Some(query), None)
+                .await?
+                .json()
+                .await?);
+        }
+        Err(super::Error::VenueNotSet())
+    }
+
+    // Query Account History
+    // https://doc.apifiny.com/connect/#query-account-history
+    pub async fn query_asset_activity_list(
+        &self,
+        params: QueryAccountHistoryParams,
+    ) -> Result<ApiFinyResponse<PagationResponse<AccountHistory>>> {
+        if let Some(ref venue) = self.venue {
+            let req_url = format!("{}/asset/queryAssetActivityList", venue.rest);
+
+            let mut query = json!({
+                "accountId": self.conf.apifiny_account_id,
+            });
+            let params = serde_json::to_value(params)?;
+
+            super::utils::merge(&mut query, &params);
+            // println!("==>{}", body);
+            // let s = self
+            //     .do_http(reqwest::Method::GET, req_url, None, Some(body))
+            //     .await?
+            //     .text()
+            //     .await?;
+            // println!("==>{}", s);
+            // return Ok(());
+
+            return Ok(self
+                .do_http(reqwest::Method::GET, req_url, Some(query), None)
+                .await?
+                .json()
+                .await?);
+        }
+        Err(super::Error::VenueNotSet())
+    }
+
+    // Query Current Fee Rate
+    // https://doc.apifiny.com/connect/#query-current-fee-rate
+    pub async fn get_commission_rate(
+        &self,
+        symbol: String,
+    ) -> Result<ApiFinyResponse<Vec<FeeRate>>> {
+        if let Some(ref venue) = self.venue {
+            let req_url = format!("{}/asset/getCommissionRate", venue.rest);
+
+            let query = json!({
+                "accountId": self.conf.apifiny_account_id,
+                "venue": venue.name,
+                "symbol": symbol,
+            });
+
+            // println!("==>{}", body);
+            // let s = self
+            //     .do_http(reqwest::Method::GET, req_url, None, Some(body))
+            //     .await?
+            //     .text()
+            //     .await?;
+            // println!("==>{}", s);
+            // return Ok(());
+
+            return Ok(self
+                .do_http(reqwest::Method::GET, req_url, Some(query), None)
+                .await?
+                .json()
+                .await?);
+        }
+        Err(super::Error::VenueNotSet())
+    }
+
+    // Query Instant Transfer Quota
+    // https://doc.apifiny.com/connect/#query-instant-transfer-quota
+    pub async fn query_max_instant_amount(&self, currency: String) -> Result<ApiFinyResponse<f64>> {
+        if let Some(ref venue) = self.venue {
+            let req_url = format!("{}/asset/query-max-instant-amount", venue.rest);
+
+            let query = json!({
+                "accountId": self.conf.apifiny_account_id,
+                "venue": venue.name,
+                "currency": currency,
+            });
+
+            // println!("==>{}", body);
+            // let s = self
+            //     .do_http(reqwest::Method::GET, req_url, None, Some(body))
+            //     .await?
+            //     .text()
+            //     .await?;
+            // println!("==>{}", s);
+            // return Ok(());
+
+            return Ok(self
+                .do_http(reqwest::Method::GET, req_url, Some(query), None)
+                .await?
+                .json()
+                .await?);
+        }
+        Err(super::Error::VenueNotSet())
+    }
+
+    // Create Conversion
+    // support COINBASEPRO only
+    // https://doc.apifiny.com/connect/#create-conversion
+    pub async fn create_conversion(
+        &self,
+        params: CreateConversionParams,
+    ) -> Result<ApiFinyResponse<CreateConversionResponse>> {
+        if let Some(ref venue) = self.venue {
+            let req_url = format!("{}/asset/currencyConversion", venue.rest);
+
+            let mut body = json!({
+                "accountId": self.conf.apifiny_account_id,
+                "venue": venue.name, // venue name, support COINBASEPRO only
+            });
+
+            let params = serde_json::to_value(params)?;
+            super::utils::merge(&mut body, &params);
+
+            // println!("==>{}", body);
+            // let s = self
+            //     .do_http(reqwest::Method::GET, req_url, None, Some(body))
+            //     .await?
+            //     .text()
+            //     .await?;
+            // println!("==>{}", s);
+            // return Ok(());
+
+            return Ok(self
+                .do_http(reqwest::Method::POST, req_url, None, Some(body))
+                .await?
+                .json()
+                .await?);
+        }
+        Err(super::Error::VenueNotSet())
+    }
+
+    // Trading
+
+    // Create New Order
+    // https://doc.apifiny.com/connect/#create-new-order
+    pub async fn create_order(&self, params: CreateOrderParams) -> Result<CreateOrderResponse> {
+        if let Some(ref venue) = self.venue {
+            let req_url = format!("{}/order/newOrder", venue.rest);
+
+            let mut body = json!({
+                "accountId": self.conf.apifiny_account_id,
+                "venue": venue.name, // venue name, support COINBASEPRO only
+            });
+
+            let params = serde_json::to_value(params)?;
+            super::utils::merge(&mut body, &params);
+
             // println!("==>{}", body);
             // let s = self
             //     .do_http(reqwest::Method::GET, req_url, None, Some(body))
@@ -313,6 +527,68 @@ pub struct CreateWithdrawParams {
     pub memo: String,
     // 	withdraw ticket
     pub ticket: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TransferBetweenVenuesParams {
+    // currency name
+    pub currency: String,
+    // the amount to withdraw
+    pub amount: f64,
+    // 	name of target venue
+    #[serde(rename(serialize = "targetVenue"))]
+    pub target_venue: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct QueryAccountHistoryParams {
+    #[serde(rename(serialize = "startTimeDate"))]
+    pub start_time_date: DateTime<Utc>,
+    #[serde(rename(serialize = "endTimeDate"))]
+    pub end_time_date: DateTime<Utc>,
+    pub limit: i32,
+    pub page: i32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CreateConversionParams {
+    // From currency, support USD or USDC only
+    currency: String,
+    // To currency, support USD or USDC only
+    #[serde(rename(serialize = "targetCurrency"))]
+    target_currency: String,
+    // the amount to convert
+    amount: f64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateOrderParams {
+    // 	order ID(Optional)
+    order_id: Option<String>,
+    order_info: OrderInfo,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OrderInfo {
+    symbol: String,
+    // order type, LIMIT or MARKET(only some venues support) or STOP or SOR(smart order router)
+    order_type: String,
+    // specifies how long the order remains in effect, 1=GTC, 3=IOC=, 7=PostOnly
+    time_in_force: i32,
+    // order side, BUY or SELL
+    order_side: String,
+    // limit price
+    limit_price: String,
+    // quantity, order size
+    quantity: String,
+    // Amount of quote asset to spend, required when orderSide is BUY, orderType = MARKET
+    total: Option<String>,
+    // Trigger price at which when the last trade price changes to this value, the stop order will be triggered; Required if orderType = STOP
+    trigger_price: Option<String>,
+    // ENTRY or LOSS; entry is for when price rises above triggerPrice, loss is for when price drops below triggerPrice; Required if orderType = STOP
+    stop_type: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -573,9 +849,152 @@ pub struct Withdraw {
     action_note: String,
     log_id: String,
     tx_id: String,
+    // SUBMITTED, COMPLETED, CANCELLED
     status: String,
     #[serde(with = "ts_milliseconds")]
     log_created_at: DateTime<Utc>,
     #[serde(with = "ts_milliseconds")]
     log_updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransferBetweenVenuesResponse {
+    account_id: String,
+    venue: String,
+    // currency name
+    currency: String,
+    // the amount to withdraw
+    amount: f64,
+    // fee of withdrawal
+    fee: f64,
+    // target venue name
+    target_venue: String,
+    // internal transfer ID
+    log_id: String,
+    // SUBMITTED, COMPLETED, CANCELLED
+    status: String,
+    #[serde(with = "ts_milliseconds")]
+    log_created_at: DateTime<Utc>,
+    #[serde(with = "ts_milliseconds")]
+    log_updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PagationResponse<T> {
+    records: Vec<T>,
+    total: i32,
+    size: i32,
+    current: i32,
+    hit_count: bool,
+    search_count: bool,
+    pages: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountHistory {
+    account_id: String,
+    currency: String,
+    // SUBMITTED, COMPLETED, CANCELLED
+    status: String,
+    #[serde(rename(serialize = "type", deserialize = "type"))]
+    kind: String,
+    amount: f64,
+    fee: f64,
+    target_address: String,
+    coin: String,
+    log_id: String,
+    #[serde(with = "ts_milliseconds")]
+    log_created_at: DateTime<Utc>,
+    #[serde(with = "ts_milliseconds")]
+    log_updated_at: DateTime<Utc>,
+    action_type: String,
+    action_note: String,
+    from_account_id: String,
+    to_account_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FeeRate {
+    account_id: String,
+    trading_volume: f64,
+    take_fee: f64,
+    make_fee: f64,
+    special_rate: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateConversionResponse {
+    // Account ID
+    account_id: String,
+    // From currency
+    currency: String,
+    // status of this account activity, SUBMITTED, COMPLETED, CANCELLED
+    status: String,
+    // OUTGOING for convert
+    #[serde(rename(serialize = "type", deserialize = "type"))]
+    kind: String,
+    // amount	amount of currency converted
+    amount: f64,
+    // fee	fee occurs during this activity
+    fee: f64,
+    // coin	internal coin name for this currency
+    coin: String,
+    // logId	internal ID
+    log_id: String,
+    #[serde(with = "ts_milliseconds")]
+    created_at: DateTime<Utc>,
+    #[serde(with = "ts_milliseconds")]
+    updated_at: DateTime<Utc>,
+    action_type: String,
+    action_note: String,
+    id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateOrderResponse {
+    // 	sub account ID
+    account_id: String,
+    // 	venue name
+    venue: String,
+    // 	order ID
+    order_id: String,
+    // symbol
+    symbol: String,
+    // order type, LIMIT or MARKET or STOP or SOR
+    order_type: String,
+    // order side, BUY or SELL
+    order_side: String,
+    // Trigger price
+    trigger_price: Option<f64>,
+    // ENTRY or LOSS
+    stop_type: Option<String>,
+    // stop order activated timestamp
+    trigger_time: Option<DateTime<Utc>>,
+    // limit price, not available for market order
+    limit_price: Option<f64>,
+    // quantity
+    quantity: f64,
+    // average fill price
+    filled_average_price: f64,
+    // accumulated fill quantity
+    filled_cumulative_quantity: f64,
+    // open quantity to be filled
+    open_quantity: f64,
+    // order status
+    order_status: String,
+    // order creation timestamp
+    created_at: DateTime<Utc>,
+    // order update timestamp
+    updated_at: Option<DateTime<Utc>>,
+    // if it is cancelled, cancellation timestamp
+    cancelled_updated_at: Option<DateTime<Utc>>,
+    // last filled timestamp
+    filled_updated_at: Option<DateTime<Utc>>,
+    total: Option<f64>,
 }
