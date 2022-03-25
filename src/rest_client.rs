@@ -3,6 +3,10 @@ use super::{
     utils::{get_http_client, signature_req},
     Result,
 };
+use chrono::{
+    serde::{ts_milliseconds, ts_milliseconds_option},
+    DateTime, Utc,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -288,14 +292,6 @@ impl RestClient {
             let params = serde_json::to_value(params)?;
 
             super::utils::merge(&mut query, &params);
-            // println!("==>{}", body);
-            // let s = self
-            //     .do_http(reqwest::Method::GET, req_url, None, Some(body))
-            //     .await?
-            //     .text()
-            //     .await?;
-            // println!("==>{}", s);
-            // return Ok(());
 
             return Ok(self
                 .do_http(reqwest::Method::GET, req_url, Some(query), None)
@@ -321,14 +317,6 @@ impl RestClient {
             let params = serde_json::to_value(params)?;
 
             super::utils::merge(&mut query, &params);
-            // println!("==>{}", body);
-            // let s = self
-            //     .do_http(reqwest::Method::GET, req_url, None, Some(body))
-            //     .await?
-            //     .text()
-            //     .await?;
-            // println!("==>{}", s);
-            // return Ok(());
 
             return Ok(self
                 .do_http(reqwest::Method::GET, req_url, Some(query), None)
@@ -354,15 +342,6 @@ impl RestClient {
                 "symbol": symbol,
             });
 
-            // println!("==>{}", body);
-            // let s = self
-            //     .do_http(reqwest::Method::GET, req_url, None, Some(body))
-            //     .await?
-            //     .text()
-            //     .await?;
-            // println!("==>{}", s);
-            // return Ok(());
-
             return Ok(self
                 .do_http(reqwest::Method::GET, req_url, Some(query), None)
                 .await?
@@ -383,15 +362,6 @@ impl RestClient {
                 "venue": venue.name,
                 "currency": currency,
             });
-
-            // println!("==>{}", body);
-            // let s = self
-            //     .do_http(reqwest::Method::GET, req_url, None, Some(body))
-            //     .await?
-            //     .text()
-            //     .await?;
-            // println!("==>{}", s);
-            // return Ok(());
 
             return Ok(self
                 .do_http(reqwest::Method::GET, req_url, Some(query), None)
@@ -420,15 +390,6 @@ impl RestClient {
             let params = serde_json::to_value(params)?;
             super::utils::merge(&mut body, &params);
 
-            // println!("==>{}", body);
-            // let s = self
-            //     .do_http(reqwest::Method::GET, req_url, None, Some(body))
-            //     .await?
-            //     .text()
-            //     .await?;
-            // println!("==>{}", s);
-            // return Ok(());
-
             return Ok(self
                 .do_http(reqwest::Method::POST, req_url, None, Some(body))
                 .await?
@@ -442,7 +403,7 @@ impl RestClient {
 
     // Create New Order
     // https://doc.apifiny.com/connect/#create-new-order
-    pub async fn create_order(&self, params: CreateOrderParams) -> Result<CreateOrderResponse> {
+    pub async fn create_order(&self, params: CreateOrderParams) -> Result<OrderResponse> {
         if let Some(ref venue) = self.venue {
             let req_url = format!("{}/order/newOrder", venue.rest);
 
@@ -454,17 +415,163 @@ impl RestClient {
             let params = serde_json::to_value(params)?;
             super::utils::merge(&mut body, &params);
 
-            // println!("==>{}", body);
-            // let s = self
-            //     .do_http(reqwest::Method::GET, req_url, None, Some(body))
-            //     .await?
-            //     .text()
-            //     .await?;
-            // println!("==>{}", s);
-            // return Ok(());
+            return Ok(self
+                .do_http(reqwest::Method::POST, req_url, None, Some(body))
+                .await?
+                .json()
+                .await?);
+        }
+        Err(super::Error::VenueNotSet())
+    }
+
+    // Cancel Order
+    // https://doc.apifiny.com/connect/#cancel-an-order
+    // @param orderId	Order ID
+    pub async fn cancel_order(&self, order_id: &str) -> Result<OrderResponse> {
+        if let Some(ref venue) = self.venue {
+            let req_url = format!("{}/order/cancelOrder", venue.rest);
+
+            let body = json!({
+                "accountId": self.conf.apifiny_account_id,
+                "venue": venue.name,
+                "orderId": order_id,
+            });
 
             return Ok(self
                 .do_http(reqwest::Method::POST, req_url, None, Some(body))
+                .await?
+                .json()
+                .await?);
+        }
+        Err(super::Error::VenueNotSet())
+    }
+
+    // Cancel All Order
+    // https://doc.apifiny.com/connect/#cancel-an-order
+    pub async fn cancel_account_venue_all_order(&self, symbol: &str) -> Result<Vec<String>> {
+        if let Some(ref venue) = self.venue {
+            let req_url = format!("{}/order/cancelAccountVenueAllOrder", venue.rest);
+
+            let body = json!({
+                "accountId": self.conf.apifiny_account_id,
+                "venue": venue.name,
+                "symbol": symbol,
+            });
+
+            return Ok(self
+                .do_http(reqwest::Method::POST, req_url, None, Some(body))
+                .await?
+                .json()
+                .await?);
+        }
+        Err(super::Error::VenueNotSet())
+    }
+
+    // Get an Order
+    // https://doc.apifiny.com/connect/#get-an-order
+    pub async fn query_order_info(&self, order_id: &str) -> Result<OrderResponse> {
+        if let Some(ref venue) = self.venue {
+            let req_url = format!("{}/order/queryOrderInfo", venue.rest);
+
+            let query = json!({
+                "accountId": self.conf.apifiny_account_id,
+                "venue": venue.name,
+                "orderId": order_id,
+            });
+
+            return Ok(self
+                .do_http(reqwest::Method::GET, req_url, Some(query), None)
+                .await?
+                .json()
+                .await?);
+        }
+        Err(super::Error::VenueNotSet())
+    }
+
+    // Query Multiple Orders by IDs
+    // https://doc.apifiny.com/connect/#query-multiple-orders-by-ids
+    pub async fn list_order_by_ids(&self, order_ids: Vec<String>) -> Result<Vec<OrderResponse>> {
+        if let Some(ref venue) = self.venue {
+            let req_url = format!("{}/order/listMultipleOrderInfo", venue.rest);
+
+            let ids = order_ids.join(",");
+            let query = json!({
+                "accountId": self.conf.apifiny_account_id,
+                "orderIdList": ids,
+            });
+
+            return Ok(self
+                .do_http(reqwest::Method::GET, req_url, Some(query), None)
+                .await?
+                .json()
+                .await?);
+        }
+        Err(super::Error::VenueNotSet())
+    }
+
+    // Query All Open Orders
+    // https://doc.apifiny.com/connect/#query-all-open-orders
+    pub async fn list_open_order(&self) -> Result<Vec<OrderResponse>> {
+        if let Some(ref venue) = self.venue {
+            let req_url = format!("{}/order/listOpenOrder", venue.rest);
+
+            let query = json!({
+                "accountId": self.conf.apifiny_account_id,
+                "venue": venue.name,
+            });
+
+            return Ok(self
+                .do_http(reqwest::Method::GET, req_url, Some(query), None)
+                .await?
+                .json()
+                .await?);
+        }
+        Err(super::Error::VenueNotSet())
+    }
+
+    // Query All Completed Orders
+    // https://doc.apifiny.com/connect/#query-all-completed-orders
+    pub async fn list_completed_order(
+        &self,
+        params: ListCompletedOrderParams,
+    ) -> Result<Vec<OrderResponse>> {
+        if let Some(ref venue) = self.venue {
+            let req_url = format!("{}/order/listCompletedOrder", venue.rest);
+
+            let mut query = json!({
+                "accountId": self.conf.apifiny_account_id,
+                "venue": venue.name,
+            });
+            let params = serde_json::to_value(&params)?;
+            super::utils::merge(&mut query, &params);
+
+            return Ok(self
+                .do_http(reqwest::Method::GET, req_url, Some(query), None)
+                .await?
+                .json()
+                .await?);
+        }
+        Err(super::Error::VenueNotSet())
+    }
+
+    // Query List Fills
+    // https://doc.apifiny.com/connect/#query-list-fills
+    pub async fn list_filled_order(
+        &self,
+        params: ListFilledOrderParams,
+    ) -> Result<Vec<OrderResponse>> {
+        if let Some(ref venue) = self.venue {
+            let req_url = format!("{}/order/listFilledOrder", venue.rest);
+
+            let mut query = json!({
+                "accountId": self.conf.apifiny_account_id,
+                "venue": venue.name,
+            });
+            let params = serde_json::to_value(&params)?;
+            super::utils::merge(&mut query, &params);
+
+            return Ok(self
+                .do_http(reqwest::Method::GET, req_url, Some(query), None)
                 .await?
                 .json()
                 .await?);
@@ -571,6 +678,61 @@ pub struct CreateOrderParams {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ListCompletedOrderParams {
+    // [Optional] Start Time
+    #[serde(with = "ts_milliseconds_option")]
+    start_time: Option<DateTime<Utc>>,
+    // [Optional] End Time
+    #[serde(with = "ts_milliseconds_option")]
+    end_time: Option<DateTime<Utc>>,
+    // total number of orders, default is 500, Max 1000
+    limit: i32,
+    // order status: PART_FILLED, FILLED, CANCELLED. (optional)
+    order_status: Option<String>,
+}
+
+impl Default for ListCompletedOrderParams {
+    fn default() -> Self {
+        ListCompletedOrderParams {
+            start_time: None,
+            end_time: None,
+            limit: 500,
+            order_status: None,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListFilledOrderParams {
+    // [Optional] Limit the list of fills to this symbol
+    symbol: Option<String>,
+    // [Optional] Limit the list of fills to this order ID
+    order_id: Option<String>,
+    // Default 500; max 1000
+    limit: i32,
+    // [Optional] Start Time
+    #[serde(with = "ts_milliseconds_option")]
+    start_time: Option<DateTime<Utc>>,
+    // [Optional] End Time
+    #[serde(with = "ts_milliseconds_option")]
+    end_time: Option<DateTime<Utc>>,
+}
+
+impl Default for ListFilledOrderParams {
+    fn default() -> Self {
+        ListFilledOrderParams {
+            symbol: None,
+            start_time: None,
+            end_time: None,
+            limit: 500,
+            order_id: None,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OrderInfo {
     symbol: String,
     // order type, LIMIT or MARKET(only some venues support) or STOP or SOR(smart order router)
@@ -656,8 +818,6 @@ pub struct SymbolInfo {
     max_notional: f64,
     status: VenueStatus,
 }
-
-use chrono::{serde::ts_milliseconds, DateTime, Utc};
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -957,7 +1117,7 @@ pub struct CreateConversionResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateOrderResponse {
+pub struct OrderResponse {
     // 	sub account ID
     account_id: String,
     // 	venue name
@@ -975,6 +1135,7 @@ pub struct CreateOrderResponse {
     // ENTRY or LOSS
     stop_type: Option<String>,
     // stop order activated timestamp
+    #[serde(with = "ts_milliseconds_option")]
     trigger_time: Option<DateTime<Utc>>,
     // limit price, not available for market order
     limit_price: Option<f64>,
@@ -991,10 +1152,36 @@ pub struct CreateOrderResponse {
     // order creation timestamp
     created_at: DateTime<Utc>,
     // order update timestamp
+    #[serde(with = "ts_milliseconds_option")]
     updated_at: Option<DateTime<Utc>>,
     // if it is cancelled, cancellation timestamp
+    #[serde(with = "ts_milliseconds_option")]
     cancelled_updated_at: Option<DateTime<Utc>>,
     // last filled timestamp
+    #[serde(with = "ts_milliseconds_option")]
     filled_updated_at: Option<DateTime<Utc>>,
     total: Option<f64>,
 }
+
+// {
+//     "accountId": "STA-VENUE1_00000001",
+//     "venue": "VENUE1",
+//     "orderId": "000000011584603011942221",
+//     "symbol": "BTCUSD",
+//     "orderType": "LIMIT",
+//     "orderSide": "BUY",
+//     "limitPrice": 100,
+//     "quantity": 1.12,
+//     "filledAveragePrice": 0,
+//     "filledCumulativeQuantity": 0,
+//     "timeInForce": 1,
+//     "openQuantity": 1.12,
+//     "orderStatus": "PENDING_SUBMIT",
+//     "createdAt": 1584603012164,
+//     "updatedAt": 1584603012164
+// }
+// #[derive(Debug, Serialize, Deserialize)]
+// #[serde(rename_all = "camelCase")]
+// pub struct OpenOrder {
+
+// }
