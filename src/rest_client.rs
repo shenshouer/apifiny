@@ -149,7 +149,7 @@ impl RestClient {
 
     // Account
 
-    pub async fn query_account_info(&self) -> Result<()> {
+    pub async fn query_account_info(&self) -> Result<ApiFinyResponse<Account>> {
         if let Some(ref venue) = self.venue {
             let req_url = format!("{}/account/queryAccountInfo", venue.rest);
 
@@ -157,15 +157,103 @@ impl RestClient {
                 "accountId": self.conf.apifiny_account_id,
                 "venue": venue.name,
             }));
-            let s = self
+
+            return Ok(self
                 .do_http(reqwest::Method::GET, req_url, query, None)
                 .await?
-                .text()
-                .await?;
-            println!("==>{}", s);
-            return Ok(());
+                .json()
+                .await?);
+        }
+        Err(super::Error::VenueNotSet())
+    }
 
-            // return Ok(self.do_http(req_url, query, None).await?.json().await?);
+    // Query Account Asset
+    pub async fn list_balance(&self) -> Result<ApiFinyResponse<Vec<Balance>>> {
+        if let Some(ref venue) = self.venue {
+            let req_url = format!("{}/asset/listBalance", venue.rest);
+
+            let query = Some(json!({
+                "accountId": self.conf.apifiny_account_id,
+                "venue": venue.name,
+            }));
+
+            return Ok(self
+                .do_http(reqwest::Method::GET, req_url, query, None)
+                .await?
+                .json()
+                .await?);
+        }
+        Err(super::Error::VenueNotSet())
+    }
+
+    // Get Deposit Address
+    pub async fn query_address(&self, coin: &str) -> Result<ApiFinyResponse<Vec<DepositAddress>>> {
+        if let Some(ref venue) = self.venue {
+            let req_url = format!("{}/asset/queryAddress", venue.rest);
+
+            let query = Some(json!({
+                "accountId": self.conf.apifiny_account_id,
+                "venue": venue.name,
+                "coin": coin,
+            }));
+
+            return Ok(self
+                .do_http(reqwest::Method::GET, req_url, query, None)
+                .await?
+                .json()
+                .await?);
+        }
+        Err(super::Error::VenueNotSet())
+    }
+
+    // Create a Withdraw Ticket
+    pub async fn create_withdraw_ticket(&self) -> Result<ApiFinyResponse<WithdrawTicket>> {
+        if let Some(ref venue) = self.venue {
+            let req_url = format!("{}/asset/createWithdrawTicket", venue.rest);
+
+            let query = Some(json!({
+                "accountId": self.conf.apifiny_account_id,
+                "venue": venue.name,
+            }));
+
+            return Ok(self
+                .do_http(reqwest::Method::GET, req_url, query, None)
+                .await?
+                .json()
+                .await?);
+        }
+        Err(super::Error::VenueNotSet())
+    }
+
+    // Create a Withdraw Request
+    pub async fn create_withdraw(
+        &self,
+        params: CreateWithdrawParams,
+    ) -> Result<ApiFinyResponse<Vec<Withdraw>>> {
+        if let Some(ref venue) = self.venue {
+            let req_url = format!("{}/asset/withdraw", venue.rest);
+
+            let mut body = json!({
+                "accountId": self.conf.apifiny_account_id,
+                "venue": venue.name,
+            });
+            let params = serde_json::to_value(params)?;
+
+            super::utils::merge(&mut body, &params);
+            // println!("==>{}", body);
+            // let s = self
+            //     .do_http(reqwest::Method::GET, req_url, None, Some(body))
+            //     .await?
+            //     .text()
+            //     .await?;
+            // println!("==>{}", s);
+            // return Ok(());
+
+            return Ok(self
+                .do_http(reqwest::Method::POST, req_url, None, Some(body))
+                .await?
+                .json()
+                .await?);
         }
         Err(super::Error::VenueNotSet())
     }
@@ -211,6 +299,20 @@ impl RestClient {
 
         Ok(resp)
     }
+}
+
+#[derive(Debug, Serialize)]
+pub struct CreateWithdrawParams {
+    // currency code in system, different from currency name if multiple chains are supported
+    pub coin: String,
+    // the amount to withdraw
+    pub amount: f64,
+    // a crypto address of the recipient
+    pub address: String,
+    // memo(Optional), It is usually necessary for EOS
+    pub memo: String,
+    // 	withdraw ticket
+    pub ticket: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -397,4 +499,83 @@ pub struct Order {
     price: f64,
     qty: f64,
     source: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Account {
+    account_id: String,
+    ex55_pin: String,
+    account_status: String,
+    #[serde(with = "ts_milliseconds")]
+    created_at: DateTime<Utc>,
+    #[serde(with = "ts_milliseconds")]
+    updated_at: DateTime<Utc>,
+    sub_account_info: Vec<SubAccount>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubAccount {
+    account_id: String,
+    account_status: String,
+    #[serde(with = "ts_milliseconds")]
+    created_at: DateTime<Utc>,
+    #[serde(with = "ts_milliseconds")]
+    updated_at: DateTime<Utc>,
+    venue: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Balance {
+    account_id: String,
+    venue: String,
+    currency: String,
+    amount: f64,
+    available: f64,
+    frozen: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DepositAddress {
+    venue: String,
+    currency: String,
+    coin: String,
+    address: String,
+    #[serde(with = "ts_milliseconds")]
+    expired_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WithdrawTicket {
+    ticket: String,
+    #[serde(with = "ts_milliseconds")]
+    expired_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Withdraw {
+    account_id: String,
+    venue: String,
+    currency: String,
+    coin: String,
+    amount: f64,
+    fee: f64,
+    from_address: Value,
+    target_address: String,
+    #[serde(rename(serialize = "type", deserialize = "type"))]
+    kind: String,
+    action_type: String,
+    action_note: String,
+    log_id: String,
+    tx_id: String,
+    status: String,
+    #[serde(with = "ts_milliseconds")]
+    log_created_at: DateTime<Utc>,
+    #[serde(with = "ts_milliseconds")]
+    log_updated_at: DateTime<Utc>,
 }
