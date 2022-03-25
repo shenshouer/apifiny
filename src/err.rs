@@ -19,6 +19,8 @@ pub enum Error {
     InvalidHeaderValue(#[from] reqwest::header::InvalidHeaderValue),
     #[error(transparent)]
     Utf8Error(#[from] core::str::Utf8Error),
+    #[error("venue not set")]
+    VenueNotSet(),
 }
 
 // new http rest error

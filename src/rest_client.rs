@@ -13,11 +13,12 @@ const BASE_URL_REST_OTHER: &str = "https://api.apifiny.com";
 // https://doc.apifiny.com/connect/#rest-api
 pub struct RestClient {
     conf: crate::ApiFiny,
+    venue: Option<super::Venue>,
 }
 
 impl RestClient {
-    pub fn new(conf: crate::ApiFiny) -> RestClient {
-        RestClient { conf }
+    pub fn new(conf: super::ApiFiny, venue: Option<super::Venue>) -> RestClient {
+        RestClient { conf, venue }
     }
 
     // Base Information
@@ -27,12 +28,20 @@ impl RestClient {
             "{}/ac/v2/{}/utils/listVenueInfo",
             BASE_URL_REST_OTHER, venue
         );
-        Ok(self.do_http(req_url, None, None).await?.json().await?)
+        Ok(self
+            .do_http(reqwest::Method::GET, req_url, None, None)
+            .await?
+            .json()
+            .await?)
     }
 
     pub async fn list_currency(&self, venue: &str) -> Result<ApiFinyResponse<Vec<CurrencyInfo>>> {
         let req_url = format!("{}/ac/v2/{}/utils/listCurrency", BASE_URL_REST_OTHER, venue);
-        Ok(self.do_http(req_url, None, None).await?.json().await?)
+        Ok(self
+            .do_http(reqwest::Method::GET, req_url, None, None)
+            .await?
+            .json()
+            .await?)
     }
 
     pub async fn list_symbol_info(&self, venue: &str) -> Result<ApiFinyResponse<Vec<SymbolInfo>>> {
@@ -40,7 +49,11 @@ impl RestClient {
             "{}/ac/v2/{}/utils/listSymbolInfo",
             BASE_URL_REST_OTHER, venue
         );
-        Ok(self.do_http(req_url, None, None).await?.json().await?)
+        Ok(self
+            .do_http(reqwest::Method::GET, req_url, None, None)
+            .await?
+            .json()
+            .await?)
     }
 
     pub async fn current_time_millis(&self, venue: &str) -> Result<ApiFinyResponse<i64>> {
@@ -48,7 +61,11 @@ impl RestClient {
             "{}/ac/v2/{}/utils/currentTimeMillis",
             BASE_URL_REST_OTHER, venue
         );
-        Ok(self.do_http(req_url, None, None).await?.json().await?)
+        Ok(self
+            .do_http(reqwest::Method::GET, req_url, None, None)
+            .await?
+            .json()
+            .await?)
     }
 
     // Market Data
@@ -59,12 +76,20 @@ impl RestClient {
             "{}/md/orderbook/v1/{}/{}",
             BASE_URL_REST_OTHER, symbol, venue
         );
-        Ok(self.do_http(req_url, None, None).await?.json().await?)
+        Ok(self
+            .do_http(reqwest::Method::GET, req_url, None, None)
+            .await?
+            .json()
+            .await?)
     }
 
     pub async fn trade(&self, symbol: &str, venue: &str) -> Result<Vec<TradeOrder>> {
         let req_url = format!("{}/md/trade/v1/{}/{}", BASE_URL_REST_OTHER, symbol, venue);
-        Ok(self.do_http(req_url, None, None).await?.json().await?)
+        Ok(self
+            .do_http(reqwest::Method::GET, req_url, None, None)
+            .await?
+            .json()
+            .await?)
     }
 
     // VENUE	Venue name
@@ -86,8 +111,6 @@ impl RestClient {
             "{}/md/kline/v1/{}/{}/{}/{}",
             BASE_URL_REST_OTHER, venue, base, quote, period
         );
-        // let s = self.do_http(req_url).await?.text().await?;
-        // println!("{}", s);
         let mut query = None;
         if start_time.is_some() && end_time.is_some() {
             query = Some(json!({
@@ -95,12 +118,20 @@ impl RestClient {
                 "endTime": end_time.unwrap().timestamp_subsec_millis(),
             }))
         }
-        Ok(self.do_http(req_url, query, None).await?.json().await?)
+        Ok(self
+            .do_http(reqwest::Method::GET, req_url, query, None)
+            .await?
+            .json()
+            .await?)
     }
 
     pub async fn ticker(&self, symbol: &str, venue: &str) -> Result<Ticker> {
         let req_url = format!("{}/md/ticker/v1/{}/{}", BASE_URL_REST_OTHER, symbol, venue);
-        Ok(self.do_http(req_url, None, None).await?.json().await?)
+        Ok(self
+            .do_http(reqwest::Method::GET, req_url, None, None)
+            .await?
+            .json()
+            .await?)
     }
 
     pub async fn consolidated_order_book(&self, symbol: &str) -> Result<ConsolidatedOrderBook> {
@@ -109,19 +140,51 @@ impl RestClient {
         // println!("==>{}", s);
         // Ok(())
 
-        Ok(self.do_http(req_url, None, None).await?.json().await?)
+        Ok(self
+            .do_http(reqwest::Method::GET, req_url, None, None)
+            .await?
+            .json()
+            .await?)
+    }
+
+    // Account
+
+    pub async fn query_account_info(&self) -> Result<()> {
+        if let Some(ref venue) = self.venue {
+            let req_url = format!("{}/account/queryAccountInfo", venue.rest);
+
+            let query = Some(json!({
+                "accountId": self.conf.apifiny_account_id,
+                "venue": venue.name,
+            }));
+            let s = self
+                .do_http(reqwest::Method::GET, req_url, query, None)
+                .await?
+                .text()
+                .await?;
+            println!("==>{}", s);
+            return Ok(());
+
+            // return Ok(self.do_http(req_url, query, None).await?.json().await?);
+        }
+        Err(super::Error::VenueNotSet())
     }
 
     // do real http request
     async fn do_http(
         &self,
+        method: reqwest::Method,
         req_url: String,
         query: Option<Value>,
         body: Option<Value>,
     ) -> Result<reqwest::Response> {
         let client = get_http_client()?;
+
+        let mut req_builder = client
+            .get(&req_url)
+            .header(reqwest::header::CONTENT_TYPE, "application/json");
+
         // set query params
-        let mut req_builder = client.get(&req_url);
         if let Some(query) = query {
             req_builder = req_builder.query(&query);
         }
@@ -133,6 +196,11 @@ impl RestClient {
 
         let mut req = req_builder.build()?;
         signature_req(&self.conf, &mut req)?;
+
+        // change method
+        let m = req.method_mut();
+        *m = method;
+
         let resp = client.execute(req).await?;
 
         let status_code = resp.status();
