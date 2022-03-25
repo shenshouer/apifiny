@@ -11,6 +11,7 @@ pub fn signature<'a>(
     let key: Hmac<Sha256> = Hmac::new_from_slice(secret).unwrap();
     let header = Header {
         algorithm: AlgorithmType::Hs256,
+        // type_: Some(HeaderType::JsonWebToken),
         ..Default::default()
     };
 

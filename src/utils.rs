@@ -19,7 +19,7 @@ pub(crate) fn signature_req(conf: &crate::ApiFiny, req: &mut reqwest::Request) -
 
     let mut claims = std::collections::BTreeMap::new();
     claims.insert("accountId", json!(conf.apifiny_account_id));
-    claims.insert("secretKeyId", json!(conf.apifiny_api_key));
+    claims.insert("secretKeyId", json!(conf.apifiny_access_key));
 
     // set JWT expiration 24 hours
     let exp = Utc::now()
@@ -51,7 +51,7 @@ pub(crate) fn signature_req(conf: &crate::ApiFiny, req: &mut reqwest::Request) -
         claims.insert("digest", json!(digest));
     }
 
-    let token = crate::token::signature(claims, conf.apifiny_api_secret.as_bytes());
+    let token = crate::token::signature(claims, conf.apifiny_secret_key.as_bytes());
     req.headers_mut().append(
         "signature",
         reqwest::header::HeaderValue::from_str(token.as_str())?,
