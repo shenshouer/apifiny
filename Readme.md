@@ -9,4 +9,5 @@ apifiny rust sdk
 
 - [done] rest api impl [no test]  
 - [not] websocket api  
-- [todp] fix api  
+- [todo] fix api  
+- [todo] integrate with https://github.com/nash-io/openlimits
